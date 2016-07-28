@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+# Download and show the National Weather Service hourly weather
+# forecast graph for Manhattan.
+#
+# iTerm only.
+# Requires NPM module imgcat-cli
+#    sudo npm -g install imgcat-cli
+
+# Constants
+forecast="/tmp/weather-forecast"
+graphic_file="/tmp/weather-graph"
+url_for_graphic="http://forecast.weather.gov/meteograms/Plotter.php?lat=40.7198&lon=-73.993&wfo=OKX&zcode=NYZ072&gset=20&gdiff=10&unit=0&tinfo=EY5&ahour=0&pcmd=11101111110000000000000000000000000000000000000000000000000&lg=en&indu=1!1!1!&dd=&bw=&hrspan=48&pqpfhr=6&psnwhr=6"
+url_for_forecast="http://forecast.weather.gov/MapClick.php?lat=40.71980&lon=-73.993&lg=english&FcstType=text"
+throttle_requests_in_seconds=$((10 * 60))
+
+duration_since_last_modified(){
+    file="$1"
+
+    datediff -i %s -f %S \
+             "$(date -r $file +%s)" \
+             now
+}
+
+# Throttle how often this script will actually spam NWS web site
+# (probably a great way to get autobanned by accident otherwise).
+
+if [ ! -f $graphic_file ] \
+       || [ $(duration_since_last_modified $graphic_file) \
+                -ge $throttle_requests_in_seconds ]
+then
+    wget -O $graphic_file $url_for_graphic
+
+    lynx --dump $url_for_forecast > $forecast
+fi
+
+cat $forecast | grep -A15 "Central Park" \
+    | egrep -v "\[.*\]" \
+    | egrep -v "Lat:" \
+    | egrep -v "^ *$" \
+    | iconv -c -f utf-8 -t ascii
+
+imgcat $graphic_file
